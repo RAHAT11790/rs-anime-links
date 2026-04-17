@@ -110,7 +110,7 @@ export function AdminWithdrawals() {
   const [list, setList] = useState<any[]>([]);
   const load = async () => { const { data } = await supabase.from("withdrawals").select("*, profiles(username,email)").order("created_at", { ascending: false }); setList(data ?? []); };
   useEffect(() => { load(); }, []);
-  const setStatus = async (id: string, status: string) => {
+  const setStatus = async (id: string, status: "approved" | "paid" | "pending" | "rejected") => {
     await supabase.from("withdrawals").update({ status }).eq("id", id); load();
   };
   return (
