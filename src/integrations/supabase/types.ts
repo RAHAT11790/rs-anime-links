@@ -14,16 +14,312 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ad_slots: {
+        Row: {
+          enabled: boolean
+          id: string
+          name: string
+          script_code: string | null
+          slot_key: string
+          updated_at: string
+        }
+        Insert: {
+          enabled?: boolean
+          id?: string
+          name: string
+          script_code?: string | null
+          slot_key: string
+          updated_at?: string
+        }
+        Update: {
+          enabled?: boolean
+          id?: string
+          name?: string
+          script_code?: string | null
+          slot_key?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      api_tokens: {
+        Row: {
+          created_at: string
+          token: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          token: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          token?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      clicks: {
+        Row: {
+          completed: boolean
+          country: string | null
+          created_at: string
+          earned: number
+          id: string
+          ip_hash: string | null
+          link_id: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean
+          country?: string | null
+          created_at?: string
+          earned?: number
+          id?: string
+          ip_hash?: string | null
+          link_id: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          completed?: boolean
+          country?: string | null
+          created_at?: string
+          earned?: number
+          id?: string
+          ip_hash?: string | null
+          link_id?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clicks_link_id_fkey"
+            columns: ["link_id"]
+            isOneToOne: false
+            referencedRelation: "links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      links: {
+        Row: {
+          alias: string | null
+          created_at: string
+          earnings: number
+          hidden: boolean
+          id: string
+          original_url: string
+          short_code: string
+          status: Database["public"]["Enums"]["link_status"]
+          title: string | null
+          updated_at: string
+          user_id: string
+          views: number
+        }
+        Insert: {
+          alias?: string | null
+          created_at?: string
+          earnings?: number
+          hidden?: boolean
+          id?: string
+          original_url: string
+          short_code: string
+          status?: Database["public"]["Enums"]["link_status"]
+          title?: string | null
+          updated_at?: string
+          user_id: string
+          views?: number
+        }
+        Update: {
+          alias?: string | null
+          created_at?: string
+          earnings?: number
+          hidden?: boolean
+          id?: string
+          original_url?: string
+          short_code?: string
+          status?: Database["public"]["Enums"]["link_status"]
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+          views?: number
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          balance: number
+          cpm_rate: number
+          created_at: string
+          email: string
+          id: string
+          payment_address: string | null
+          payment_method: string | null
+          plan: string
+          referral_earnings: number
+          referred_by: string | null
+          total_earnings: number
+          total_views: number
+          updated_at: string
+          user_id: string
+          username: string
+        }
+        Insert: {
+          balance?: number
+          cpm_rate?: number
+          created_at?: string
+          email: string
+          id?: string
+          payment_address?: string | null
+          payment_method?: string | null
+          plan?: string
+          referral_earnings?: number
+          referred_by?: string | null
+          total_earnings?: number
+          total_views?: number
+          updated_at?: string
+          user_id: string
+          username: string
+        }
+        Update: {
+          balance?: number
+          cpm_rate?: number
+          created_at?: string
+          email?: string
+          id?: string
+          payment_address?: string | null
+          payment_method?: string | null
+          plan?: string
+          referral_earnings?: number
+          referred_by?: string | null
+          total_earnings?: number
+          total_views?: number
+          updated_at?: string
+          user_id?: string
+          username?: string
+        }
+        Relationships: []
+      }
+      referrals: {
+        Row: {
+          created_at: string
+          earned: number
+          id: string
+          referred_id: string
+          referrer_id: string
+        }
+        Insert: {
+          created_at?: string
+          earned?: number
+          id?: string
+          referred_id: string
+          referrer_id: string
+        }
+        Update: {
+          created_at?: string
+          earned?: number
+          id?: string
+          referred_id?: string
+          referrer_id?: string
+        }
+        Relationships: []
+      }
+      settings: {
+        Row: {
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      withdrawals: {
+        Row: {
+          address: string
+          admin_note: string | null
+          amount: number
+          created_at: string
+          id: string
+          method: string
+          status: Database["public"]["Enums"]["withdrawal_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address: string
+          admin_note?: string | null
+          amount: number
+          created_at?: string
+          id?: string
+          method: string
+          status?: Database["public"]["Enums"]["withdrawal_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string
+          admin_note?: string | null
+          amount?: number
+          created_at?: string
+          id?: string
+          method?: string
+          status?: Database["public"]["Enums"]["withdrawal_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      gen_api_token: { Args: never; Returns: string }
+      gen_short_code: { Args: never; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
+      link_status: "active" | "disabled"
+      withdrawal_status: "pending" | "approved" | "rejected" | "paid"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +446,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+      link_status: ["active", "disabled"],
+      withdrawal_status: ["pending", "approved", "rejected", "paid"],
+    },
   },
 } as const
