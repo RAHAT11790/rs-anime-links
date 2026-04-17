@@ -1,0 +1,7 @@
+project_id = "zdjzxkpgvqgwpjxrjywt"
+
+[functions.shorten-api]
+verify_jwt = false
+
+[functions.track-click]
+verify_jwt = false
