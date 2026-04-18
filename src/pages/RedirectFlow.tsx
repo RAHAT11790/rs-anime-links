@@ -1,167 +1,308 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { AdSlot, FakeBanner } from "@/components/AdSlot";
+import { AdSlot, FakeBanner, FakeBannerGrid, TopBanner } from "@/components/AdSlot";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowRight, Lock, CheckCircle2 } from "lucide-react";
+import { Loader2, ArrowRight, Lock, CheckCircle2, Shield } from "lucide-react";
 import logo from "@/assets/logo.png";
-
-type Step = 0 | 1 | 2 | 3 | 4 | 5; // 0 loading, 1-3 ad steps, 4 final gate, 5 redirect
 
 const STEP_WAIT = 10;
 const FINAL_WAIT = 5;
 
+const PLAN_STEPS: Record<string, number> = {
+  Default: 2,
+  Premium: 2,
+  Pro: 3,
+  Top: 4,
+};
+
 export default function RedirectFlow() {
   const { code } = useParams();
   const nav = useNavigate();
-  const [step, setStep] = useState<Step>(0);
+  const [step, setStep] = useState(0); // 0 loading, 1..N ad steps, N+1 final gate, N+2 redirect
   const [link, setLink] = useState<any>(null);
+  const [ownerPlan, setOwnerPlan] = useState<string>("Default");
   const [error, setError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(STEP_WAIT);
   const [verified, setVerified] = useState(false);
 
-  // load link
+  // load link + owner's plan
   useEffect(() => {
     if (!code) return;
     (async () => {
       const { data, error } = await supabase.from("links").select("*").eq("short_code", code).maybeSingle();
-      if (error || !data) { setError("Link not found"); return; }
-      if (data.status !== "active") { setError("This link has been disabled"); return; }
+      if (error || !data) {
+        setError("Link not found");
+        return;
+      }
+      if (data.status !== "active") {
+        setError("This link has been disabled");
+        return;
+      }
       setLink(data);
+
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("plan")
+        .eq("user_id", data.user_id)
+        .maybeSingle();
+      setOwnerPlan(prof?.plan || "Default");
+
+      // settings override
+      const { data: settings } = await supabase
+        .from("settings")
+        .select("value")
+        .eq("key", "plan_steps")
+        .maybeSingle();
+      if (settings?.value) {
+        Object.assign(PLAN_STEPS, settings.value as Record<string, number>);
+      }
+
       setStep(1);
-      // log click
-      try { await supabase.functions.invoke("track-click", { body: { link_id: data.id } }); } catch {}
+      try {
+        await supabase.functions.invoke("track-click", { body: { link_id: data.id } });
+      } catch {}
     })();
   }, [code]);
 
-  // countdown timer
+  const totalSteps = PLAN_STEPS[ownerPlan] ?? 2;
+  const finalStepNum = totalSteps + 1; // gate
+  const redirectStepNum = totalSteps + 2;
+
+  // countdown
   useEffect(() => {
-    if (step === 0 || step === 5) return;
-    setCountdown(step === 4 ? FINAL_WAIT : STEP_WAIT);
+    if (step === 0 || step >= redirectStepNum) return;
+    setCountdown(step === finalStepNum ? FINAL_WAIT : STEP_WAIT);
     setVerified(false);
-    const t = setInterval(() => setCountdown((c) => { if (c <= 1) { clearInterval(t); return 0; } return c - 1; }), 1000);
+    const t = setInterval(
+      () =>
+        setCountdown((c) => {
+          if (c <= 1) {
+            clearInterval(t);
+            return 0;
+          }
+          return c - 1;
+        }),
+      1000
+    );
     return () => clearInterval(t);
-  }, [step]);
+  }, [step, finalStepNum, redirectStepNum]);
 
-  if (error) {
-    return <div className="min-h-screen flex items-center justify-center p-6 bg-background">
-      <div className="text-center max-w-md">
-        <div className="text-6xl mb-4">⚠️</div>
-        <h1 className="text-2xl font-bold mb-2">{error}</h1>
-        <Button onClick={() => nav("/")}>Go Home</Button>
+  if (error)
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-background">
+        <div className="text-center max-w-md">
+          <div className="text-6xl mb-4">⚠️</div>
+          <h1 className="text-2xl font-bold mb-2">{error}</h1>
+          <Button onClick={() => nav("/")}>Go Home</Button>
+        </div>
       </div>
-    </div>;
-  }
-  if (step === 0 || !link) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
+    );
+  if (step === 0 || !link)
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="animate-spin" />
+      </div>
+    );
 
-  if (step === 5) {
+  if (step === redirectStepNum) {
     window.location.href = link.original_url;
-    return <div className="min-h-screen flex items-center justify-center"><div className="text-center"><Loader2 className="animate-spin mx-auto mb-2" /><div>Redirecting…</div></div></div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="animate-spin mx-auto mb-2" />
+          <div>Redirecting…</div>
+        </div>
+      </div>
+    );
   }
 
-  const totalSteps = 3;
-  const stepLabel = step <= 3 ? `${step}/${totalSteps}` : `${totalSteps}/${totalSteps}`;
+  const stepLabel = step <= totalSteps ? `${step}/${totalSteps}` : `${totalSteps}/${totalSteps}`;
+  const isFinalGate = step === finalStepNum;
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="bg-secondary text-secondary-foreground">
+      {/* Sticky header */}
+      <header className="bg-secondary text-secondary-foreground sticky top-0 z-30 shadow-elevated">
         <div className="container flex items-center justify-between py-2">
-          <img src={logo} alt="RS ANIME LINK" width={1024} height={512} className="h-8 w-auto bg-white px-2 py-1 rounded" />
+          <img
+            src={logo}
+            alt="RS ANIME LINK"
+            width={200}
+            height={48}
+            className="h-9 w-auto bg-white px-2 py-1 rounded"
+          />
+          <div className="flex items-center gap-1 text-xs font-bold">
+            <Shield className="h-3.5 w-3.5 text-success" /> Secure Gateway
+          </div>
         </div>
       </header>
 
-      <div className="container py-3">
-        <div className="bg-card border rounded-lg px-4 py-2 text-center font-bold shadow-card">
-          You are currently on step <span className="text-brand-red">{stepLabel}</span>
+      {/* Top banner — appears on EVERY step */}
+      <TopBanner />
+
+      {/* Step indicator */}
+      <div className="container max-w-3xl py-3">
+        <div className="bg-card border rounded-lg px-4 py-3 text-center font-bold shadow-card">
+          You are on step{" "}
+          <span className="text-brand-red text-lg">{stepLabel}</span>
+          <span className="text-muted-foreground font-normal text-xs ml-2">
+            (Plan: {ownerPlan})
+          </span>
         </div>
       </div>
 
-      <main className="container max-w-2xl pb-8 space-y-4">
-        {step <= 3 && <StepAd step={step} verified={verified} setVerified={setVerified} countdown={countdown} setStep={setStep} />}
-        {step === 4 && <FinalGate countdown={countdown} onContinue={() => setStep(5)} />}
+      <main className="container max-w-3xl pb-10 space-y-5">
+        {!isFinalGate && (
+          <StepAd
+            step={step}
+            totalSteps={totalSteps}
+            verified={verified}
+            setVerified={setVerified}
+            countdown={countdown}
+            onContinue={() => setStep(step + 1)}
+          />
+        )}
+        {isFinalGate && (
+          <FinalGate countdown={countdown} onContinue={() => setStep(redirectStepNum)} />
+        )}
 
-        {/* Bottom fake banners always */}
-        <div className="grid sm:grid-cols-2 gap-3 mt-6">
+        {/* Mid fake banner */}
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1 text-center">
+            — Sponsored —
+          </div>
           <FakeBanner />
-          <FakeBanner />
+        </div>
+
+        {/* Real native banner */}
+        <AdSlot slotKey="native_banner" minHeight={200} fallback={<FakeBanner />} />
+
+        {/* Bottom fake banner grid */}
+        <div className="pt-2">
+          <div className="text-xs font-bold mb-2 text-muted-foreground">You may also like</div>
+          <FakeBannerGrid count={4} />
         </div>
       </main>
     </div>
   );
 }
 
-function StepAd({ step, verified, setVerified, countdown, setStep }: any) {
-  const isStep1 = step === 1;
-  const isStep2 = step === 2;
-  const isStep3 = step === 3;
+function StepAd({
+  step,
+  totalSteps,
+  verified,
+  setVerified,
+  countdown,
+  onContinue,
+}: {
+  step: number;
+  totalSteps: number;
+  verified: boolean;
+  setVerified: (v: boolean) => void;
+  countdown: number;
+  onContinue: () => void;
+}) {
+  const slotKey = `step${Math.min(step, 4)}_banner`;
+  const cta = step === 1 ? "Verify" : "Click Here Continue";
 
   return (
-    <div className="bg-card rounded-xl border shadow-card p-4 space-y-4">
+    <div className="bg-card rounded-2xl border-2 shadow-elevated p-4 md:p-6 space-y-5">
       <div className="space-y-2">
-        <div className="font-bold flex items-start gap-2">
+        <div className="font-bold flex items-start gap-2 text-base md:text-lg">
           <span>👇</span>
-          <span>Click Image &amp; Wait &amp; Come back this page to <span className="text-brand-red">Get Link - Download</span>.</span>
+          <span>
+            Click the image &amp; wait, then come back to{" "}
+            <span className="text-brand-red">Get Download Link</span>
+          </span>
         </div>
-        <div className="text-sm">
-          ▼ <span className="text-brand-red font-bold">LINK পানে এবং DOWNLOAD করতে</span> এর জন্য, 👇 ছবিতে ক্লিক করুন,
+        <div className="text-sm text-muted-foreground">
+          ▼ <span className="text-brand-red font-bold">LINK পেতে এবং DOWNLOAD করতে</span> 👇 ছবিতে ক্লিক করুন,
           <span className="text-primary font-bold"> {countdown} সেকেন্ড অপেক্ষা করুন</span> এবং ফিরে আসুন।
         </div>
       </div>
 
-      {/* Real ad slot */}
-      <AdSlot slotKey={`step${step}_banner`} fallback={<FakeBanner />} className="min-h-[260px]" />
+      {/* Real ad slot — BIG */}
+      <AdSlot
+        slotKey={slotKey}
+        minHeight={320}
+        fallback={<FakeBanner />}
+        className="w-full"
+      />
 
-      {/* Verify / Continue button */}
-      {!verified && countdown > 0 && (
-        <div className="text-center">
-          <div className="text-xs text-muted-foreground mb-2">Wait {countdown}s before continuing…</div>
-          <Button disabled className="bg-muted">
-            <Lock className="h-4 w-4 mr-1" /> {countdown}s
+      {/* Verify / Continue */}
+      <div className="text-center pt-2">
+        {!verified && countdown > 0 && (
+          <>
+            <div className="text-xs text-muted-foreground mb-2">
+              Please wait {countdown}s before continuing…
+            </div>
+            <Button
+              disabled
+              size="lg"
+              className="rounded-full px-12 py-6 text-base font-bold bg-muted w-full sm:w-auto"
+            >
+              <Lock className="h-4 w-4 mr-2" /> {countdown}s
+            </Button>
+          </>
+        )}
+        {!verified && countdown === 0 && (
+          <Button
+            onClick={() => setVerified(true)}
+            size="lg"
+            className="bg-brand-red hover:bg-brand-red/90 text-brand-red-foreground rounded-full px-12 py-6 text-base font-bold w-full sm:w-auto animate-pulse"
+          >
+            {cta}
           </Button>
-        </div>
-      )}
-      {!verified && countdown === 0 && (
-        <div className="text-center">
-          <Button onClick={() => setVerified(true)} size="lg" className="bg-brand-red hover:bg-brand-red/90 text-brand-red-foreground rounded-full px-10 font-bold">
-            {isStep1 ? "Verify" : isStep2 ? "Click Here Continue" : "Click Here Continue"}
-          </Button>
-        </div>
-      )}
-      {verified && (
-        <div className="text-center space-y-2">
-          <div className="flex items-center justify-center gap-1 text-success font-bold">
-            <CheckCircle2 className="h-5 w-5" /> Verified!
+        )}
+        {verified && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-center gap-2 text-success font-bold text-lg">
+              <CheckCircle2 className="h-6 w-6" /> Verified!
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Great! Scroll down and click Continue to go to step {step + 1}.
+            </p>
+            <Button
+              onClick={onContinue}
+              size="lg"
+              className="bg-success hover:bg-success/90 text-success-foreground rounded-full px-12 py-6 text-base font-bold w-full sm:w-auto"
+            >
+              Continue <ArrowRight className="h-5 w-5 ml-2" />
+            </Button>
           </div>
-          <p className="text-sm text-muted-foreground">
-            {isStep1 && "Great! Now scroll down and click Continue to go to step 2."}
-            {isStep2 && "Awesome! Scroll down and continue to step 3."}
-            {isStep3 && "Almost there! Continue to the final step."}
-          </p>
-          <Button onClick={() => setStep(step + 1)} size="lg" className="bg-success hover:bg-success/90 text-success-foreground rounded-full px-10 font-bold">
-            Continue <ArrowRight className="h-4 w-4 ml-1" />
-          </Button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
 
 function FinalGate({ countdown, onContinue }: { countdown: number; onContinue: () => void }) {
   return (
-    <div className="bg-card rounded-xl border shadow-card p-4 space-y-4">
+    <div className="bg-card rounded-2xl border-2 shadow-elevated p-4 md:p-6 space-y-5">
       <div className="text-center">
-        <div className="text-2xl font-bold mb-1">🎉 Final Step</div>
-        <p className="text-sm text-muted-foreground">Wait {countdown} seconds for your link…</p>
+        <div className="text-3xl font-extrabold mb-1">🎉 Final Step</div>
+        <p className="text-sm text-muted-foreground">
+          Your link will unlock in <b className="text-brand-red">{countdown}s</b>
+        </p>
       </div>
-      <AdSlot slotKey="step3_banner" fallback={<FakeBanner />} className="min-h-[200px]" />
-      <div className="text-center">
+      <AdSlot slotKey="step4_banner" minHeight={280} fallback={<FakeBanner />} />
+      <div className="text-center pt-2">
         {countdown > 0 ? (
-          <Button disabled size="lg" className="rounded-full px-10 font-bold bg-muted">
-            <Lock className="h-4 w-4 mr-1" /> Get Link in {countdown}s
+          <Button
+            disabled
+            size="lg"
+            className="rounded-full px-12 py-6 text-base font-bold bg-muted w-full sm:w-auto"
+          >
+            <Lock className="h-4 w-4 mr-2" /> Get Link in {countdown}s
           </Button>
         ) : (
-          <Button onClick={onContinue} size="lg" className="rounded-full px-10 font-bold bg-success hover:bg-success/90 text-success-foreground">
-            Get Link <ArrowRight className="h-4 w-4 ml-1" />
+          <Button
+            onClick={onContinue}
+            size="lg"
+            className="rounded-full px-12 py-6 text-base font-bold bg-success hover:bg-success/90 text-success-foreground w-full sm:w-auto animate-pulse"
+          >
+            Get Link <ArrowRight className="h-5 w-5 ml-2" />
           </Button>
         )}
       </div>
