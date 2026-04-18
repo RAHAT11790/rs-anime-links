@@ -1,10 +1,20 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { AdSlot, FakeBanner, FakeBannerGrid, TopBanner } from "@/components/AdSlot";
+import { AdSlot, FakeBanner, FakeBannerGrid, TopBanner, GlobalAdScripts } from "@/components/AdSlot";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowRight, Lock, CheckCircle2, Shield } from "lucide-react";
 import logo from "@/assets/logo.png";
+
+// Direct-link / popunder URLs that open in a NEW TAB on first click of every step.
+// Replace the placeholder with your real Adsterra/Monetag direct-link URLs in DB later.
+const DIRECT_LINKS = [
+  "https://www.profitablecpmratenetwork.com/m1qkz3rrt?key=auto",
+  "https://5gvci.com/4/10891433",
+];
+function pickDirectLink() {
+  return DIRECT_LINKS[Math.floor(Math.random() * DIRECT_LINKS.length)];
+}
 
 const STEP_WAIT = 10;
 const FINAL_WAIT = 5;
@@ -122,6 +132,9 @@ export default function RedirectFlow() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Mount real ad scripts (popunder / monetag SW) ONLY on the redirect flow */}
+      <GlobalAdScripts />
+
       {/* Sticky header */}
       <header className="bg-secondary text-secondary-foreground sticky top-0 z-30 shadow-elevated">
         <div className="container flex items-center justify-between py-2">
