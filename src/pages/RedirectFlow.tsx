@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { AdSlot, FakeBanner, FakeBannerGrid, TopBanner, GlobalAdScripts } from "@/components/AdSlot";
+import { AdBlockGuard } from "@/components/AdBlockGuard";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowRight, Lock, CheckCircle2, Shield } from "lucide-react";
 import logo from "@/assets/logo.png";
@@ -69,8 +70,21 @@ export default function RedirectFlow() {
       }
 
       setStep(1);
+
+      // Track click — use admin-configurable base URL if set, fallback to default
       try {
-        await supabase.functions.invoke("track-click", { body: { link_id: data.id } });
+        const { data: fb } = await supabase
+          .from("settings")
+          .select("value")
+          .eq("key", "function_base_url")
+          .maybeSingle();
+        const base = ((fb?.value as string) || import.meta.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");
+        const anon = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+        await fetch(`${base}/functions/v1/track-click`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", apikey: anon, Authorization: `Bearer ${anon}` },
+          body: JSON.stringify({ link_id: data.id }),
+        });
       } catch {}
     })();
   }, [code]);
@@ -131,6 +145,7 @@ export default function RedirectFlow() {
   const isFinalGate = step === finalStepNum;
 
   return (
+    <AdBlockGuard>
     <div className="min-h-screen bg-background">
       {/* Mount real ad scripts (popunder / monetag SW) ONLY on the redirect flow */}
       <GlobalAdScripts />
@@ -180,6 +195,11 @@ export default function RedirectFlow() {
           <FinalGate countdown={countdown} onContinue={() => setStep(redirectStepNum)} />
         )}
 
+        {/* Adsterra 300x250 banner */}
+        <div className="flex justify-center">
+          <AdSlot slotKey="adsterra_300x250" minHeight={250} className="w-[300px] mx-auto" fallback={<FakeBanner />} />
+        </div>
+
         {/* Mid fake banner */}
         <div>
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1 text-center">
@@ -189,7 +209,7 @@ export default function RedirectFlow() {
         </div>
 
         {/* Real native banner */}
-        <AdSlot slotKey="native_banner" minHeight={200} fallback={<FakeBanner />} />
+        <AdSlot slotKey="adsterra_native" minHeight={200} fallback={<FakeBanner />} />
 
         {/* Bottom fake banner grid */}
         <div className="pt-2">
@@ -198,6 +218,7 @@ export default function RedirectFlow() {
         </div>
       </main>
     </div>
+    </AdBlockGuard>
   );
 }
 

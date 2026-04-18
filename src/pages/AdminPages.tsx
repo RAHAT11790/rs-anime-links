@@ -424,32 +424,76 @@ function SlotEditor({
 export function AdminSettings() {
   const [site, setSite] = useState<any>(null);
   const [planSteps, setPlanSteps] = useState<any>({ Default: 2, Premium: 2, Pro: 3, Top: 4 });
+  const [funcBase, setFuncBase] = useState<string>("");
+  const defaultBase = (import.meta as any).env?.VITE_SUPABASE_URL || "";
 
   useEffect(() => {
     (async () => {
-      const [{ data: s }, { data: ps }] = await Promise.all([
+      const [{ data: s }, { data: ps }, { data: fb }] = await Promise.all([
         supabase.from("settings").select("value").eq("key", "site").maybeSingle(),
         supabase.from("settings").select("value").eq("key", "plan_steps").maybeSingle(),
+        supabase.from("settings").select("value").eq("key", "function_base_url").maybeSingle(),
       ]);
       setSite(s?.value ?? {});
       if (ps?.value) setPlanSteps(ps.value);
+      setFuncBase((fb?.value as string) || "");
     })();
   }, []);
 
   if (!site) return null;
 
   const save = async () => {
-    const [r1, r2] = await Promise.all([
+    const [r1, r2, r3] = await Promise.all([
       supabase.from("settings").upsert({ key: "site", value: site }),
       supabase.from("settings").upsert({ key: "plan_steps", value: planSteps }),
+      supabase.from("settings").upsert({ key: "function_base_url", value: funcBase as any }),
     ]);
-    if (r1.error || r2.error) toast.error("Save failed");
+    if (r1.error || r2.error || r3.error) toast.error("Save failed");
     else toast.success("Settings saved ✓");
   };
 
   return (
     <div className="space-y-4 max-w-2xl pb-24 md:pb-6">
       <h1 className="text-2xl font-bold">Site Settings</h1>
+
+      {/* Editable Function Base URL */}
+      <div className="bg-card border-2 border-primary/40 rounded-xl p-4 shadow-card space-y-3">
+        <div>
+          <div className="font-bold text-base">⚡ Edge Function Base URL</div>
+          <p className="text-xs text-muted-foreground mt-1">
+            ভবিষ্যতে যদি Supabase project change করেন, এখানে নতুন project URL paste করুন।
+            Empty থাকলে current project default URL use হবে।
+          </p>
+        </div>
+        <div>
+          <Label>Function Base URL (Supabase project URL)</Label>
+          <Input
+            value={funcBase}
+            onChange={(e) => setFuncBase(e.target.value)}
+            placeholder={defaultBase || "https://your-project.supabase.co"}
+            className="font-mono text-xs"
+          />
+          <p className="text-[11px] text-muted-foreground mt-1">
+            Default (current): <code className="bg-muted px-1 rounded">{defaultBase}</code>
+          </p>
+        </div>
+      </div>
+
+      {/* Monetag verification helper */}
+      <div className="bg-card border rounded-xl p-4 shadow-card space-y-2">
+        <div className="font-bold text-base">📡 Monetag Verification</div>
+        <p className="text-xs text-muted-foreground">
+          Monetag panel এ "Verify" করার সময় <b>Service-worker URL</b> চাইলে দিন:
+        </p>
+        <code className="block bg-muted px-2 py-1.5 rounded text-xs break-all">
+          {window.location.origin}/sw.js
+        </code>
+        <p className="text-xs text-muted-foreground">
+          আর <b>Tag-method</b> চাইলে: head tag verification meta automatic add করা আছে।
+          Verify হওয়ার পর Monetag dashboard থেকে নতুন ad zone codes copy করে এই panel এ "Ad Slots" section এ paste করুন।
+        </p>
+      </div>
+
       <div className="bg-card border rounded-xl p-4 shadow-card space-y-3">
         {[
           ["name", "Site name"],
