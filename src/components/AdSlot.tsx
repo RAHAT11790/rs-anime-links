@@ -179,8 +179,11 @@ export function PopupBanner({
   const handleBannerClick = () => {
     if (clicked) return;
     setClicked(true);
+    // Open ad in new tab — silently swallow any error (e.g. "resource not found")
     try {
-      window.open(directLink, "_blank", "noopener,noreferrer");
+      const w = window.open(directLink, "_blank", "noopener,noreferrer");
+      // If popup blocked, just close after a moment
+      if (!w) setTimeout(onClose, 2000);
     } catch {}
     setTimeout(onClose, 5000);
   };

@@ -21,14 +21,26 @@ export default function Dashboard() {
     (async () => {
       const { data: profile } = await supabase.from("profiles").select("*").eq("user_id", user.id).maybeSingle();
       if (profile) {
+        // TODAY ONLY (resets every midnight)
         const today = new Date(); today.setHours(0,0,0,0);
         const { data: todayClicks } = await supabase.from("clicks")
           .select("earned").eq("user_id", user.id).gte("created_at", today.toISOString());
         const tEarn = (todayClicks ?? []).reduce((s, c: any) => s + Number(c.earned), 0);
+
+        // Today's referral earnings — 20% of clicks made today by referred users
+        const { data: refs } = await supabase.from("referrals").select("referred_id").eq("referrer_id", user.id);
+        let tRef = 0;
+        if (refs && refs.length) {
+          const ids = refs.map((r: any) => r.referred_id);
+          const { data: refClicks } = await supabase.from("clicks")
+            .select("earned").in("user_id", ids).gte("created_at", today.toISOString());
+          tRef = (refClicks ?? []).reduce((s, c: any) => s + Number(c.earned) * 0.20, 0);
+        }
+
         setStats({
           totalViews: Number(profile.total_views), totalEarnings: Number(profile.total_earnings),
           refEarnings: Number(profile.referral_earnings), avgCpm: Number(profile.cpm_rate),
-          todayViews: (todayClicks ?? []).length, todayEarnings: tEarn, todayRef: 0,
+          todayViews: (todayClicks ?? []).length, todayEarnings: tEarn, todayRef: tRef,
         });
       }
     })();
