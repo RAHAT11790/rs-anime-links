@@ -70,8 +70,21 @@ export default function RedirectFlow() {
       }
 
       setStep(1);
+
+      // Track click — use admin-configurable base URL if set, fallback to default
       try {
-        await supabase.functions.invoke("track-click", { body: { link_id: data.id } });
+        const { data: fb } = await supabase
+          .from("settings")
+          .select("value")
+          .eq("key", "function_base_url")
+          .maybeSingle();
+        const base = ((fb?.value as string) || import.meta.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");
+        const anon = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+        await fetch(`${base}/functions/v1/track-click`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", apikey: anon, Authorization: `Bearer ${anon}` },
+          body: JSON.stringify({ link_id: data.id }),
+        });
       } catch {}
     })();
   }, [code]);
