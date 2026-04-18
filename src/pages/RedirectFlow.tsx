@@ -1,17 +1,37 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { AdSlot, FakeBanner, FakeBannerGrid, TopBanner, GlobalAdScripts } from "@/components/AdSlot";
+import {
+  AdSlot,
+  FakeBanner,
+  TopBanner,
+  GlobalAdScripts,
+  PopupBanner,
+} from "@/components/AdSlot";
 import { AdBlockGuard } from "@/components/AdBlockGuard";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowRight, Lock, CheckCircle2, Shield, ChevronDown } from "lucide-react";
+import {
+  Loader2,
+  ArrowRight,
+  Lock,
+  CheckCircle2,
+  Shield,
+  ChevronDown,
+  Send,
+  Users,
+  MessageCircle,
+} from "lucide-react";
 import logo from "@/assets/logo.png";
 
-// Direct-link URLs that open in a NEW TAB on first click of every step.
+/* Direct-link URLs — opened ONCE per button click (first click only). */
 const DIRECT_LINKS = ["https://omg10.com/4/10891592", "https://5gvci.com/4/10891433"];
 function pickDirectLink() {
   return DIRECT_LINKS[Math.floor(Math.random() * DIRECT_LINKS.length)];
 }
+
+/* Telegram links (used everywhere) */
+const TELEGRAM_PROFILE = "https://t.me/RS_WONER";
+const TELEGRAM_CHANNEL = "https://t.me/cartoonfunny03";
 
 const STEP_WAIT = 10;
 const FINAL_WAIT = 5;
@@ -80,7 +100,6 @@ export default function RedirectFlow() {
   const finalStepNum = totalSteps + 1;
   const redirectStepNum = totalSteps + 2;
 
-  // countdown
   useEffect(() => {
     if (step === 0 || step >= redirectStepNum) return;
     setCountdown(step === finalStepNum ? FINAL_WAIT : STEP_WAIT);
@@ -131,13 +150,14 @@ export default function RedirectFlow() {
 
   const stepLabel = step <= totalSteps ? `${step}/${totalSteps}` : `${totalSteps}/${totalSteps}`;
   const isFinalGate = step === finalStepNum;
+  // Pop-up banner only on first 2 steps
+  const showPopup = step === 1 || step === 2;
 
   return (
     <AdBlockGuard>
       <div className="min-h-screen bg-background">
         <GlobalAdScripts />
 
-        {/* Sticky header */}
         <header className="bg-secondary text-secondary-foreground sticky top-0 z-30 shadow-elevated">
           <div className="container flex items-center justify-between py-2">
             <img
@@ -153,10 +173,8 @@ export default function RedirectFlow() {
           </div>
         </header>
 
-        {/* Top banner */}
         <TopBanner />
 
-        {/* Step indicator */}
         <div className="container max-w-3xl py-3">
           <div className="bg-card border-2 rounded-lg px-4 py-3 text-center font-bold shadow-card">
             You are currently on step{" "}
@@ -167,7 +185,7 @@ export default function RedirectFlow() {
           </div>
         </div>
 
-        <main className="container max-w-3xl pb-10 space-y-5">
+        <main className="container max-w-3xl pb-10 space-y-4">
           {!isFinalGate ? (
             <StepFlow
               key={step}
@@ -177,6 +195,7 @@ export default function RedirectFlow() {
               setVerified={setVerified}
               countdown={countdown}
               onContinue={() => setStep(step + 1)}
+              showPopup={showPopup}
             />
           ) : (
             <FinalFlow
@@ -191,7 +210,9 @@ export default function RedirectFlow() {
 }
 
 /* ============================================================
-   STEP FLOW — Verify on top, ads in the middle, Continue at bottom
+   STEP FLOW
+   - Steps 1 & 2: heavier, with pop-up banner overlay on mount
+   - Steps 3+: lighter
    ============================================================ */
 function StepFlow({
   step,
@@ -200,6 +221,7 @@ function StepFlow({
   setVerified,
   countdown,
   onContinue,
+  showPopup,
 }: {
   step: number;
   totalSteps: number;
@@ -207,13 +229,15 @@ function StepFlow({
   setVerified: (v: boolean) => void;
   countdown: number;
   onContinue: () => void;
+  showPopup: boolean;
 }) {
   const [adClicked, setAdClicked] = useState(false);
-  const [continueAdClicked, setContinueAdClicked] = useState(false);
+  const [popupOpen, setPopupOpen] = useState(showPopup);
   const continueRef = useRef<HTMLDivElement>(null);
   const slotKey = `step${Math.min(step, 4)}_banner`;
+  const isLightStep = step >= 3; // steps 3 & 4 → simpler
 
-  // Verify: 1st click → opens direct link, 2nd click → verified + auto-scroll down
+  // Verify: 1st click → opens direct link ONCE, 2nd click → verified + auto-scroll
   const handleVerify = () => {
     if (!adClicked) {
       try {
@@ -223,46 +247,47 @@ function StepFlow({
       return;
     }
     setVerified(true);
-    // auto-scroll down to continue button after a beat
     setTimeout(() => {
       continueRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 400);
   };
 
-  // Continue: 1st click → opens direct link, 2nd click → next step
+  // Continue: ONE click = open ad + go next (no double click anymore)
+  const [continuing, setContinuing] = useState(false);
   const handleContinue = () => {
-    if (!continueAdClicked) {
-      try {
-        window.open(pickDirectLink(), "_blank", "noopener,noreferrer");
-      } catch {}
-      setContinueAdClicked(true);
-      return;
-    }
-    onContinue();
+    if (continuing) return;
+    setContinuing(true);
+    try {
+      window.open(pickDirectLink(), "_blank", "noopener,noreferrer");
+    } catch {}
+    // small delay so popup gets focus, then advance
+    setTimeout(onContinue, 600);
   };
 
   return (
     <>
-      {/* ====== TOP CARD: Verify ====== */}
-      <section className="bg-card rounded-2xl border-2 shadow-elevated p-4 md:p-6 space-y-5">
+      {popupOpen && (
+        <PopupBanner directLink={pickDirectLink()} onClose={() => setPopupOpen(false)} />
+      )}
+
+      {/* TOP CARD: Verify */}
+      <section className="bg-card rounded-2xl border-2 shadow-elevated p-4 md:p-6 space-y-4">
         <div className="space-y-2">
           <div className="font-bold flex items-start gap-2 text-base md:text-lg">
             <span>👇</span>
             <span>
-              Click Image &amp; Wait &amp; Come back this page to{" "}
-              <span className="text-brand-red">Get Link - Download</span>.
+              Click image, wait 10 seconds & come back to{" "}
+              <span className="text-brand-red">Get Download Link</span>
             </span>
           </div>
           <div className="text-sm text-muted-foreground">
-            ▼ <span className="text-brand-red font-bold">LINK পেতে এবং DOWNLOAD করতে</span> 👇 ছবিতে ক্লিক করুন,
-            <span className="text-primary font-bold"> {countdown} সেকেন্ড অপেক্ষা করুন</span> এবং ফিরে আসুন।
+            ▼ <span className="text-brand-red font-bold">CLICK ANY IMAGE</span> &amp; WAIT{" "}
+            <span className="text-primary font-bold">{countdown} SECONDS</span> TO GET LINK ▼
           </div>
         </div>
 
-        {/* Real ad slot for Verify */}
-        <AdSlot slotKey={slotKey} minHeight={320} fallback={<FakeBanner />} className="w-full" />
+        <AdSlot slotKey={slotKey} minHeight={280} fallback={<FakeBanner />} className="w-full" />
 
-        {/* Verify button */}
         <div className="text-center pt-2">
           {!verified && countdown > 0 && (
             <>
@@ -304,48 +329,39 @@ function StepFlow({
         </div>
       </section>
 
-      {/* ====== AD SECTION 1: Big banner ====== */}
-      <BannerSection title="Sponsored">
-        <AdSlot slotKey="adsterra_300x250" minHeight={250} className="w-[300px] mx-auto" fallback={<FakeBanner />} />
-      </BannerSection>
+      {/* MIDDLE ADS — fewer for light steps */}
+      {!isLightStep ? (
+        <>
+          <BannerSection title="Sponsored">
+            <AdSlot slotKey="adsterra_300x250" minHeight={250} className="w-[300px] mx-auto" fallback={<FakeBanner />} />
+          </BannerSection>
+          <BannerSection title="Recommended">
+            <AdSlot slotKey="adsterra_native" minHeight={200} fallback={<FakeBanner />} />
+          </BannerSection>
+        </>
+      ) : (
+        <BannerSection title="Sponsored">
+          <FakeBanner />
+        </BannerSection>
+      )}
 
-      {/* ====== AD SECTION 2: Native ====== */}
-      <BannerSection title="Recommended for you">
-        <AdSlot slotKey="adsterra_native" minHeight={200} fallback={<FakeBanner />} />
-      </BannerSection>
-
-      {/* ====== AD SECTION 3: Fake banner showcase ====== */}
-      <BannerSection title="Featured Offers">
-        <FakeBanner />
-      </BannerSection>
-
-      {/* ====== AD SECTION 4: Grid ====== */}
-      <BannerSection title="You may also like">
-        <FakeBannerGrid count={4} />
-      </BannerSection>
-
-      {/* ====== AD SECTION 5: Another big banner before Continue ====== */}
-      <BannerSection title="Sponsored">
-        <FakeBanner />
-      </BannerSection>
-
-      {/* ====== BOTTOM CARD: Continue ====== */}
+      {/* BOTTOM CARD: Continue */}
       <section
         ref={continueRef}
-        className={`bg-card rounded-2xl border-2 shadow-elevated p-4 md:p-6 space-y-5 ${
+        className={`bg-card rounded-2xl border-2 shadow-elevated p-4 md:p-6 space-y-4 ${
           verified ? "ring-4 ring-success/30" : "opacity-90"
         }`}
       >
         <div className="text-center space-y-2">
           <div className="text-xl font-extrabold">
-            Scroll down & click on <span className="text-primary">Continue</span> button for your destination link
+            Click <span className="text-primary">Continue</span> to get your link
           </div>
           <p className="text-sm text-muted-foreground">
             Step {step} of {totalSteps} — almost there!
           </p>
         </div>
 
-        <AdSlot slotKey={`step${Math.min(step, 4)}_continue`} minHeight={250} fallback={<FakeBanner />} />
+        <AdSlot slotKey={`step${Math.min(step, 4)}_continue`} minHeight={200} fallback={<FakeBanner />} />
 
         <div className="text-center pt-2">
           {!verified ? (
@@ -358,31 +374,31 @@ function StepFlow({
               </Button>
             </>
           ) : (
-            <>
-              {continueAdClicked && (
-                <div className="text-xs text-success mb-2 font-semibold">
-                  ✓ Ad opened — click Continue again to go to step {step + 1}
-                </div>
+            <Button
+              onClick={handleContinue}
+              disabled={continuing}
+              size="lg"
+              className="bg-brand-red hover:bg-brand-red/90 text-brand-red-foreground rounded-full px-12 py-6 text-base font-bold w-full sm:w-auto animate-pulse shadow-elevated"
+            >
+              {continuing ? (
+                <>
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" /> Opening…
+                </>
+              ) : (
+                <>
+                  Continue <ArrowRight className="h-5 w-5 ml-2" />
+                </>
               )}
-              <Button
-                onClick={handleContinue}
-                size="lg"
-                className="bg-brand-red hover:bg-brand-red/90 text-brand-red-foreground rounded-full px-12 py-6 text-base font-bold w-full sm:w-auto animate-pulse shadow-elevated"
-              >
-                {continueAdClicked ? "Click Again to Continue" : "Continue"}{" "}
-                <ArrowRight className="h-5 w-5 ml-2" />
-              </Button>
-            </>
+            </Button>
           )}
         </div>
 
-        {/* Steps helper */}
         <div className="border-t pt-3 text-center text-xs text-muted-foreground">
-          🔴 <b className="text-primary">Steps to 🔗 Get link 🔗</b>
+          🔴 <b className="text-primary">Steps to get link</b>
           <div className="flex justify-around mt-2 font-semibold text-foreground">
-            <span>1. Click On banner/AD</span>
-            <span>2. Wait 10 second on ad page</span>
-            <span>3. Come Back Here</span>
+            <span>1. Click ad</span>
+            <span>2. Wait 10s</span>
+            <span>3. Come back</span>
           </div>
         </div>
       </section>
@@ -391,75 +407,128 @@ function StepFlow({
 }
 
 /* ============================================================
-   FINAL FLOW — last gate before redirect
+   FINAL FLOW — Telegram-style design, no ad on Get Link button
    ============================================================ */
 function FinalFlow({ countdown, onContinue }: { countdown: number; onContinue: () => void }) {
-  const [adClicked, setAdClicked] = useState(false);
-  const handleClick = () => {
-    if (!adClicked) {
-      try {
-        window.open(pickDirectLink(), "_blank", "noopener,noreferrer");
-      } catch {}
-      setAdClicked(true);
-      return;
-    }
-    onContinue();
-  };
   return (
     <>
-      <section className="bg-card rounded-2xl border-2 shadow-elevated p-4 md:p-6 space-y-5">
-        <div className="text-center">
-          <div className="text-3xl font-extrabold mb-1">🎉 Final Step</div>
-          <p className="text-sm text-muted-foreground">
-            Your link will unlock in <b className="text-brand-red">{countdown}s</b>
-          </p>
+      {/* Telegram-style hero card */}
+      <section className="bg-card rounded-2xl border-2 shadow-elevated overflow-hidden">
+        <div className="bg-gradient-to-br from-[hsl(200,100%,50%)] to-[hsl(220,90%,55%)] text-white p-6 text-center">
+          <div className="inline-flex items-center gap-2 bg-yellow-400 text-black text-xs font-bold px-3 py-1 rounded-full mb-3">
+            ⚡ JOIN OUR TELEGRAM CHANNEL TO GET LINK
+          </div>
+          <div className="grid grid-cols-[1fr_auto] items-center gap-4 mt-4">
+            <div className="text-left">
+              <div className="text-3xl font-black leading-tight">JOIN OUR</div>
+              <div className="text-4xl font-black text-yellow-300 leading-tight">TELEGRAM</div>
+              <div className="text-3xl font-black leading-tight">CHANNEL</div>
+            </div>
+            <div className="text-7xl">📱</div>
+          </div>
         </div>
-        <AdSlot slotKey="step4_banner" minHeight={280} fallback={<FakeBanner />} />
-      </section>
 
-      <BannerSection title="Sponsored">
-        <FakeBanner />
-      </BannerSection>
+        {/* Telegram CTA buttons */}
+        <div className="p-4 space-y-2">
+          <a
+            href={TELEGRAM_CHANNEL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 bg-[hsl(200,100%,50%)] hover:bg-[hsl(200,100%,45%)] text-white font-bold py-3 rounded-xl transition shadow-card"
+          >
+            <Send className="h-5 w-5" /> Join Our Telegram Channel
+          </a>
+          <a
+            href={TELEGRAM_PROFILE}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 bg-card border-2 hover:bg-muted/50 text-foreground font-bold py-3 rounded-xl transition"
+          >
+            <MessageCircle className="h-5 w-5" /> Contact Admin on Telegram
+          </a>
+        </div>
 
-      <BannerSection title="Recommended">
-        <FakeBannerGrid count={4} />
-      </BannerSection>
+        {/* Countdown ring */}
+        <div className="px-6 pb-6 text-center">
+          <p className="font-bold text-lg mb-3">Your link is almost ready</p>
+          <div className="relative inline-flex items-center justify-center">
+            <svg className="h-24 w-24 -rotate-90" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="44" stroke="hsl(var(--muted))" strokeWidth="6" fill="none" />
+              <circle
+                cx="50"
+                cy="50"
+                r="44"
+                stroke="hsl(var(--primary))"
+                strokeWidth="6"
+                fill="none"
+                strokeDasharray={`${2 * Math.PI * 44}`}
+                strokeDashoffset={`${2 * Math.PI * 44 * (countdown / FINAL_WAIT)}`}
+                strokeLinecap="round"
+                className="transition-all duration-1000"
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-2xl font-black text-primary">{countdown}</span>
+              <span className="text-[10px] uppercase text-muted-foreground">seconds</span>
+            </div>
+          </div>
+        </div>
 
-      <section className="bg-card rounded-2xl border-2 shadow-elevated p-4 md:p-6 space-y-5">
-        <AdSlot slotKey="adsterra_300x250" minHeight={250} className="w-[300px] mx-auto" fallback={<FakeBanner />} />
-        <div className="text-center pt-2">
+        {/* Get Link button — NO ads next to it */}
+        <div className="px-6 pb-6 text-center">
           {countdown > 0 ? (
             <Button
               disabled
               size="lg"
               className="rounded-full px-12 py-6 text-base font-bold bg-muted w-full sm:w-auto"
             >
-              <Lock className="h-4 w-4 mr-2" /> Get Link in {countdown}s
+              <Lock className="h-4 w-4 mr-2" /> Please wait {countdown}s
             </Button>
           ) : (
-            <>
-              {adClicked && (
-                <div className="text-xs text-success mb-2 font-semibold">
-                  ✓ Ad opened — click again to get your link
-                </div>
-              )}
-              <Button
-                onClick={handleClick}
-                size="lg"
-                className="rounded-full px-12 py-6 text-base font-bold bg-success hover:bg-success/90 text-success-foreground w-full sm:w-auto animate-pulse"
-              >
-                {adClicked ? "Click Again to Get Link" : "Get Link"} <ArrowRight className="h-5 w-5 ml-2" />
-              </Button>
-            </>
+            <Button
+              onClick={onContinue}
+              size="lg"
+              className="rounded-full px-12 py-6 text-base font-bold bg-success hover:bg-success/90 text-success-foreground w-full sm:w-auto animate-pulse shadow-elevated"
+            >
+              Get Link <ArrowRight className="h-5 w-5 ml-2" />
+            </Button>
           )}
         </div>
       </section>
+
+      {/* Single small bottom banner — NOT next to Get Link */}
+      <section className="bg-card rounded-xl border shadow-card overflow-hidden">
+        <div className="flex items-center justify-between bg-muted/50 px-3 py-1.5 border-b">
+          <span className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">
+            Sponsored
+          </span>
+          <span className="text-[9px] uppercase tracking-wider bg-foreground/10 text-muted-foreground px-1.5 py-0.5 rounded">
+            Ad
+          </span>
+        </div>
+        <div className="p-3">
+          <FakeBanner compact />
+        </div>
+      </section>
+
+      {/* Footer */}
+      <div className="text-center text-xs text-muted-foreground pt-4 space-y-2">
+        <div className="flex justify-center gap-3">
+          <a href={TELEGRAM_CHANNEL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+            <Users className="h-3 w-3" /> Channel
+          </a>
+          <a href={TELEGRAM_PROFILE} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+            <MessageCircle className="h-3 w-3" /> Contact
+          </a>
+        </div>
+        <div>© RS Anime Link {new Date().getFullYear()}</div>
+      </div>
     </>
   );
 }
 
 /* ============================================================
-   BANNER SECTION — dedicated, professional ad banner card
+   BANNER SECTION
    ============================================================ */
 function BannerSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (

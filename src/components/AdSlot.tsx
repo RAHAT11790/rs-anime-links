@@ -1,19 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { X } from "lucide-react";
 
-/* ---------- REAL ad slot ---------- */
+/* ---------- REAL ad slot (with our own close button) ---------- */
 export function AdSlot({
   slotKey,
   fallback,
   className = "",
   minHeight = 250,
+  closable = true,
 }: {
   slotKey: string;
   fallback?: React.ReactNode;
   className?: string;
   minHeight?: number;
+  closable?: boolean;
 }) {
   const [code, setCode] = useState<string | null>(null);
+  const [closed, setClosed] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -29,7 +33,6 @@ export function AdSlot({
       });
   }, [slotKey]);
 
-  // Re-execute injected <script> tags (innerHTML doesn't run them)
   useEffect(() => {
     if (!code || !ref.current) return;
     const scripts = ref.current.querySelectorAll("script");
@@ -41,25 +44,69 @@ export function AdSlot({
     });
   }, [code]);
 
+  if (closed) return null;
   if (code === null)
     return (
       <div className={`ad-skeleton ${className}`} style={{ minHeight }}>
         Loading sponsored content…
       </div>
     );
-  if (code)
-    return (
-      <div
-        ref={ref}
-        className={`overflow-hidden rounded-lg ${className}`}
-        style={{ minHeight }}
-        dangerouslySetInnerHTML={{ __html: code }}
-      />
-    );
-  return <>{fallback ?? <FakeBanner className={className} />}</>;
+
+  const inner = code ? (
+    <div
+      ref={ref}
+      className="overflow-hidden rounded-lg"
+      style={{ minHeight }}
+      dangerouslySetInnerHTML={{ __html: code }}
+    />
+  ) : (
+    <>{fallback ?? <FakeBanner className={className} />}</>
+  );
+
+  if (!closable) return <div className={className}>{inner}</div>;
+
+  return (
+    <div className={`relative ${className}`}>
+      <CloseButton onClose={() => setClosed(true)} />
+      {inner}
+    </div>
+  );
 }
 
-/* ---------- TOP banner — appears on every redirect step ---------- */
+/* ---------- Smart close button: shows fake "Click ad to close" then closes ---------- */
+function CloseButton({ onClose }: { onClose: () => void }) {
+  const [tries, setTries] = useState(0);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const handle = () => {
+    if (tries < 1) {
+      setMsg("Please click the ad to close this banner");
+      setTries(tries + 1);
+      setTimeout(() => setMsg(null), 2500);
+      return;
+    }
+    onClose();
+  };
+
+  return (
+    <>
+      <button
+        onClick={handle}
+        aria-label="Close ad"
+        className="absolute -top-2 -right-2 z-20 h-7 w-7 rounded-full bg-foreground text-background shadow-elevated flex items-center justify-center hover:scale-110 transition border-2 border-background"
+      >
+        <X className="h-4 w-4" />
+      </button>
+      {msg && (
+        <div className="absolute -top-9 right-0 z-20 text-[10px] bg-foreground text-background px-2 py-1 rounded shadow whitespace-nowrap">
+          {msg}
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ---------- TOP banner ---------- */
 export function TopBanner() {
   return (
     <div className="container max-w-3xl py-3">
@@ -71,13 +118,10 @@ export function TopBanner() {
   );
 }
 
-/* ---------- Site-wide ad scripts — ONLY mounted on redirect flow ---------- */
-/* Loads: Monetag Multitag, Onclick/Popunder, Vignette banner + any DB extras */
+/* ---------- Site-wide ad scripts (Multitag + Vignette ONLY — no popunder here, popunder is triggered manually via direct links) ---------- */
 const HARDCODED_AD_SCRIPTS = [
   // Monetag Multitag
   `<script src="https://quge5.com/88/tag.min.js" data-zone="230930" async data-cfasync="false"></script>`,
-  // Monetag Onclick (Popunder)
-  `<script>(function(s){s.dataset.zone='10891589',s.src='https://al5sm.com/tag.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))</script>`,
   // Monetag Vignette
   `<script>(function(s){s.dataset.zone='10891590',s.src='https://n6wxm.com/vignette.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))</script>`,
 ];
@@ -98,48 +142,125 @@ function injectAdHtml(html: string) {
 
 export function GlobalAdScripts() {
   useEffect(() => {
-    // 1) Always inject hardcoded Monetag ad codes
+    if (document.querySelector("[data-ad-injected]")) return;
     HARDCODED_AD_SCRIPTS.forEach(injectAdHtml);
-
-    // 2) Plus any optional DB-driven extras (popunder/monetag_sw slot)
-    let cancelled = false;
-    (async () => {
-      const { data } = await supabase
-        .from("ad_slots")
-        .select("slot_key,script_code,enabled")
-        .in("slot_key", ["popunder", "monetag_sw"]);
-      if (cancelled || !data) return;
-      data.forEach((slot) => {
-        if (!slot.enabled || !slot.script_code) return;
-        injectAdHtml(slot.script_code);
-      });
-    })();
-    return () => {
-      cancelled = true;
-    };
   }, []);
   return null;
 }
 
-/* ---------- FAKE banner pool — inspired by AroLinks/UrlBot fake ads ---------- */
+/* ---------- POP-UP BANNER — overlay ad shown on steps 1 & 2 ----------
+   - Visible countdown: 10s. Real auto-close: 15s (if user doesn't click).
+   - Click banner → opens ad (popunder/direct), then closes after ~5s.
+   - User can manually click X but it shows "click ad first" up to 1 retry.
+*/
+export function PopupBanner({
+  onClose,
+  directLink,
+}: {
+  onClose: () => void;
+  directLink: string;
+}) {
+  const [shown, setShown] = useState(10); // visible countdown
+  const [clicked, setClicked] = useState(false);
+  const [closeTries, setCloseTries] = useState(0);
+  const [tip, setTip] = useState<string | null>(null);
+
+  useEffect(() => {
+    // visible countdown 10 → 0
+    const t1 = setInterval(() => setShown((s) => (s <= 1 ? 0 : s - 1)), 1000);
+    // real auto-close at 15s
+    const t2 = setTimeout(onClose, 15000);
+    return () => {
+      clearInterval(t1);
+      clearTimeout(t2);
+    };
+  }, [onClose]);
+
+  const handleBannerClick = () => {
+    if (clicked) return;
+    setClicked(true);
+    try {
+      window.open(directLink, "_blank", "noopener,noreferrer");
+    } catch {}
+    setTimeout(onClose, 5000);
+  };
+
+  const handleX = () => {
+    if (closeTries < 1 && !clicked) {
+      setTip("Click the ad to close this banner");
+      setCloseTries(closeTries + 1);
+      setTimeout(() => setTip(null), 2500);
+      return;
+    }
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
+      <div className="relative w-full max-w-md bg-card rounded-2xl shadow-elevated border-2 overflow-hidden">
+        {/* Header */}
+        <div className="bg-secondary text-secondary-foreground px-4 py-2 flex items-center justify-between">
+          <span className="text-[10px] uppercase tracking-widest font-bold opacity-80">
+            Sponsored
+          </span>
+          <button
+            onClick={handleX}
+            className="h-7 w-7 rounded-full bg-foreground/10 hover:bg-foreground/20 flex items-center justify-center transition"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Banner */}
+        <button
+          onClick={handleBannerClick}
+          className="block w-full p-5 bg-gradient-to-br from-primary via-brand-red to-secondary text-white text-left hover:brightness-110 transition"
+        >
+          <div className="text-xs uppercase tracking-wider opacity-80 mb-2">
+            🔥 Featured Offer
+          </div>
+          <div className="text-2xl font-extrabold leading-tight mb-3">
+            Click here & wait 10s on ad page to continue
+          </div>
+          <div className="text-sm opacity-90 mb-4">
+            Demo: After 10s click this link to open the offer. Banner will auto-close in <b>{shown}s</b>.
+          </div>
+          <div className="inline-flex items-center gap-2 bg-white text-black font-bold px-4 py-2 rounded-full text-sm shadow">
+            Click Ad to Continue →
+          </div>
+        </button>
+
+        {/* Status footer */}
+        <div className="px-4 py-2 text-center text-xs text-muted-foreground bg-muted/30 border-t">
+          {clicked
+            ? "✓ Ad opened — closing shortly…"
+            : shown > 0
+            ? `Auto-closing in ${shown}s`
+            : "You can close this now"}
+        </div>
+
+        {tip && (
+          <div className="absolute top-12 right-3 text-[11px] bg-foreground text-background px-2 py-1 rounded shadow">
+            {tip}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- FAKE banner pool ---------- */
 const fakeAds = [
   { title: "🏏 ICC World Cup 2026 — Live HD Streaming Free!", brand: "CricLive", color: "from-emerald-600 to-green-700", cta: "Watch Now" },
-  { title: "💰 Earn $500/day from Cricket Predictions", brand: "BetWin", color: "from-yellow-500 to-orange-600", cta: "Try Free" },
+  { title: "💰 Earn $500/day from Crypto Trading", brand: "BinX Pro", color: "from-yellow-500 to-orange-600", cta: "Try Free" },
   { title: "📲 Download MX Player Pro — All Codecs Unlocked", brand: "MXPro", color: "from-red-500 to-rose-700", cta: "Install" },
   { title: "🎬 Stream 10,000+ Anime in 4K — Free Forever", brand: "AnimeFlix", color: "from-violet-600 to-purple-700", cta: "Start Watching" },
-  { title: "📈 Trade Crypto with $100 Welcome Bonus", brand: "BinX Pro", color: "from-amber-500 to-yellow-600", cta: "Claim $100" },
   { title: "🔒 NordVPN — 80% OFF + 3 Months Free", brand: "NordVPN", color: "from-blue-700 to-indigo-800", cta: "Get Deal" },
-  { title: "💎 Free Fire Diamonds Generator — 100% Working", brand: "FF Tools", color: "from-orange-600 to-red-600", cta: "Generate" },
   { title: "📚 Learn English in 30 Days — Free Course", brand: "SpeakUp", color: "from-cyan-600 to-blue-700", cta: "Enroll Free" },
-  { title: "🛍️ Daraz Mega Sale — Up to 90% Off Everything", brand: "Daraz", color: "from-pink-600 to-rose-700", cta: "Shop Now" },
-  { title: "💼 Earn ₹50,000/month from Home — Genuine Job", brand: "WorkHub", color: "from-teal-600 to-emerald-700", cta: "Apply Now" },
-  { title: "🎮 PUBG Mobile UC at 70% Discount", brand: "GameTopup", color: "from-yellow-600 to-amber-700", cta: "Top-up" },
-  { title: "📱 iPhone 16 Pro — Win for Just $1 Lottery", brand: "iWin", color: "from-slate-700 to-zinc-900", cta: "Enter Now" },
-  { title: "❤️ Find Your Match Tonight — Free Sign Up", brand: "DateMe", color: "from-pink-500 to-fuchsia-600", cta: "Join Free" },
-  { title: "🚗 Bike Insurance from ₹499 — Compare & Save", brand: "InsureGo", color: "from-blue-600 to-sky-700", cta: "Get Quote" },
-  { title: "🎁 Spin & Win Real Cash — Every 10 minutes", brand: "SpinCash", color: "from-fuchsia-600 to-pink-700", cta: "Spin Now" },
-  { title: "📺 Watch IPL Free in HD — No Buffering", brand: "IPL Live", color: "from-indigo-600 to-blue-700", cta: "Watch Live" },
-  { title: "🪙 Bitcoin Mining App — Earn 0.001 BTC/day", brand: "CryptoMine", color: "from-orange-500 to-yellow-600", cta: "Start Mining" },
+  { title: "🛍️ Mega Sale — Up to 90% Off Everything", brand: "ShopMax", color: "from-pink-600 to-rose-700", cta: "Shop Now" },
+  { title: "🎮 Free Game UC & Diamonds Top-up", brand: "GameTopup", color: "from-yellow-600 to-amber-700", cta: "Top-up" },
+  { title: "📱 Win iPhone 16 Pro for Just $1", brand: "iWin", color: "from-slate-700 to-zinc-900", cta: "Enter Now" },
   { title: "✈️ Cheap Flight Tickets — Save up to 70%", brand: "FlyCheap", color: "from-sky-500 to-blue-600", cta: "Search" },
 ];
 
@@ -150,13 +271,13 @@ export function FakeBanner({ className = "", compact = false }: { className?: st
       href="#"
       onClick={(e) => e.preventDefault()}
       className={`block rounded-lg overflow-hidden border bg-gradient-to-br ${ad.color} text-white shadow-elevated relative group ${
-        compact ? "p-3 min-h-[80px]" : "p-6 min-h-[280px]"
+        compact ? "p-3 min-h-[80px]" : "p-6 min-h-[240px]"
       } flex flex-col justify-between ${className}`}
     >
-      <div className={`absolute top-2 right-2 bg-black/30 backdrop-blur text-[9px] px-2 py-0.5 rounded uppercase tracking-wider`}>
+      <div className="absolute top-2 right-2 bg-black/30 backdrop-blur text-[9px] px-2 py-0.5 rounded uppercase tracking-wider">
         Ad
       </div>
-      <div className={`font-extrabold leading-tight drop-shadow ${compact ? "text-base" : "text-2xl md:text-3xl"}`}>
+      <div className={`font-extrabold leading-tight drop-shadow ${compact ? "text-base" : "text-xl md:text-2xl"}`}>
         {ad.title}
       </div>
       {!compact && (
@@ -173,8 +294,7 @@ export function FakeBanner({ className = "", compact = false }: { className?: st
   );
 }
 
-/* ---------- Grid of multiple fake banners ---------- */
-export function FakeBannerGrid({ count = 4 }: { count?: number }) {
+export function FakeBannerGrid({ count = 2 }: { count?: number }) {
   return (
     <div className="grid sm:grid-cols-2 gap-3">
       {Array.from({ length: count }).map((_, i) => (

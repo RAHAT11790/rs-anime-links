@@ -59,7 +59,7 @@ export default function DashboardLayout() {
             <button onClick={() => setOpen(!open)} className="p-2 -ml-2 lg:hidden">
               {open ? <X /> : <Menu />}
             </button>
-            <a href="https://t.me" target="_blank" rel="noreferrer" className="hidden sm:flex items-center gap-2 bg-sidebar-accent px-3 py-1.5 rounded text-xs font-bold">
+            <a href="https://t.me/cartoonfunny03" target="_blank" rel="noreferrer" className="hidden sm:flex items-center gap-2 bg-sidebar-accent px-3 py-1.5 rounded text-xs font-bold">
               <Send className="h-3.5 w-3.5" /> TELEGRAM
             </a>
             <Link to="/links/new" className="bg-primary text-primary-foreground px-4 py-1.5 rounded text-sm font-bold hover:bg-primary/90 transition">
