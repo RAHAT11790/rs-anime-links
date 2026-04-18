@@ -1,10 +1,20 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { AdSlot, FakeBanner, FakeBannerGrid, TopBanner } from "@/components/AdSlot";
+import { AdSlot, FakeBanner, FakeBannerGrid, TopBanner, GlobalAdScripts } from "@/components/AdSlot";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowRight, Lock, CheckCircle2, Shield } from "lucide-react";
 import logo from "@/assets/logo.png";
+
+// Direct-link / popunder URLs that open in a NEW TAB on first click of every step.
+// Replace the placeholder with your real Adsterra/Monetag direct-link URLs in DB later.
+const DIRECT_LINKS = [
+  "https://www.profitablecpmratenetwork.com/m1qkz3rrt?key=auto",
+  "https://5gvci.com/4/10891433",
+];
+function pickDirectLink() {
+  return DIRECT_LINKS[Math.floor(Math.random() * DIRECT_LINKS.length)];
+}
 
 const STEP_WAIT = 10;
 const FINAL_WAIT = 5;
@@ -122,6 +132,9 @@ export default function RedirectFlow() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Mount real ad scripts (popunder / monetag SW) ONLY on the redirect flow */}
+      <GlobalAdScripts />
+
       {/* Sticky header */}
       <header className="bg-secondary text-secondary-foreground sticky top-0 z-30 shadow-elevated">
         <div className="container flex items-center justify-between py-2">
@@ -204,7 +217,20 @@ function StepAd({
   onContinue: () => void;
 }) {
   const slotKey = `step${Math.min(step, 4)}_banner`;
+  const [adClicked, setAdClicked] = useState(false);
   const cta = step === 1 ? "Verify" : "Click Here Continue";
+
+  // 2-click system: 1st click → opens direct-link in new tab, 2nd click → marks verified
+  const handleVerifyClick = () => {
+    if (!adClicked) {
+      try {
+        window.open(pickDirectLink(), "_blank", "noopener,noreferrer");
+      } catch {}
+      setAdClicked(true);
+      return;
+    }
+    setVerified(true);
+  };
 
   return (
     <div className="bg-card rounded-2xl border-2 shadow-elevated p-4 md:p-6 space-y-5">
@@ -247,13 +273,20 @@ function StepAd({
           </>
         )}
         {!verified && countdown === 0 && (
-          <Button
-            onClick={() => setVerified(true)}
-            size="lg"
-            className="bg-brand-red hover:bg-brand-red/90 text-brand-red-foreground rounded-full px-12 py-6 text-base font-bold w-full sm:w-auto animate-pulse"
-          >
-            {cta}
-          </Button>
+          <>
+            {adClicked && (
+              <div className="text-xs text-success mb-2 font-semibold">
+                ✓ Ad opened — click the button again to continue
+              </div>
+            )}
+            <Button
+              onClick={handleVerifyClick}
+              size="lg"
+              className="bg-brand-red hover:bg-brand-red/90 text-brand-red-foreground rounded-full px-12 py-6 text-base font-bold w-full sm:w-auto animate-pulse"
+            >
+              {adClicked ? "Click Again to Continue" : cta}
+            </Button>
+          </>
         )}
         {verified && (
           <div className="space-y-3">
@@ -278,6 +311,17 @@ function StepAd({
 }
 
 function FinalGate({ countdown, onContinue }: { countdown: number; onContinue: () => void }) {
+  const [adClicked, setAdClicked] = useState(false);
+  const handleClick = () => {
+    if (!adClicked) {
+      try {
+        window.open(pickDirectLink(), "_blank", "noopener,noreferrer");
+      } catch {}
+      setAdClicked(true);
+      return;
+    }
+    onContinue();
+  };
   return (
     <div className="bg-card rounded-2xl border-2 shadow-elevated p-4 md:p-6 space-y-5">
       <div className="text-center">
@@ -297,13 +341,20 @@ function FinalGate({ countdown, onContinue }: { countdown: number; onContinue: (
             <Lock className="h-4 w-4 mr-2" /> Get Link in {countdown}s
           </Button>
         ) : (
-          <Button
-            onClick={onContinue}
-            size="lg"
-            className="rounded-full px-12 py-6 text-base font-bold bg-success hover:bg-success/90 text-success-foreground w-full sm:w-auto animate-pulse"
-          >
-            Get Link <ArrowRight className="h-5 w-5 ml-2" />
-          </Button>
+          <>
+            {adClicked && (
+              <div className="text-xs text-success mb-2 font-semibold">
+                ✓ Ad opened — click again to get your link
+              </div>
+            )}
+            <Button
+              onClick={handleClick}
+              size="lg"
+              className="rounded-full px-12 py-6 text-base font-bold bg-success hover:bg-success/90 text-success-foreground w-full sm:w-auto animate-pulse"
+            >
+              {adClicked ? "Click Again to Get Link" : "Get Link"} <ArrowRight className="h-5 w-5 ml-2" />
+            </Button>
+          </>
         )}
       </div>
     </div>

@@ -20,7 +20,6 @@ import RedirectFlow from "./pages/RedirectFlow";
 import DashboardLayout from "./components/DashboardLayout";
 import AdminLayout from "./components/AdminLayout";
 import { RequireAuth } from "./components/RequireAuth";
-import { GlobalAdScripts } from "./components/AdSlot";
 import {
   AdminOverview, AdminUsers, AdminLinks, AdminWithdrawals, AdminAds, AdminSettings,
 } from "./pages/AdminPages";
@@ -33,7 +32,6 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <GlobalAdScripts />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
