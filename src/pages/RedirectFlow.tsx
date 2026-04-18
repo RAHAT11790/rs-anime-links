@@ -217,7 +217,20 @@ function StepAd({
   onContinue: () => void;
 }) {
   const slotKey = `step${Math.min(step, 4)}_banner`;
+  const [adClicked, setAdClicked] = useState(false);
   const cta = step === 1 ? "Verify" : "Click Here Continue";
+
+  // 2-click system: 1st click → opens direct-link in new tab, 2nd click → marks verified
+  const handleVerifyClick = () => {
+    if (!adClicked) {
+      try {
+        window.open(pickDirectLink(), "_blank", "noopener,noreferrer");
+      } catch {}
+      setAdClicked(true);
+      return;
+    }
+    setVerified(true);
+  };
 
   return (
     <div className="bg-card rounded-2xl border-2 shadow-elevated p-4 md:p-6 space-y-5">
@@ -260,13 +273,20 @@ function StepAd({
           </>
         )}
         {!verified && countdown === 0 && (
-          <Button
-            onClick={() => setVerified(true)}
-            size="lg"
-            className="bg-brand-red hover:bg-brand-red/90 text-brand-red-foreground rounded-full px-12 py-6 text-base font-bold w-full sm:w-auto animate-pulse"
-          >
-            {cta}
-          </Button>
+          <>
+            {adClicked && (
+              <div className="text-xs text-success mb-2 font-semibold">
+                ✓ Ad opened — click the button again to continue
+              </div>
+            )}
+            <Button
+              onClick={handleVerifyClick}
+              size="lg"
+              className="bg-brand-red hover:bg-brand-red/90 text-brand-red-foreground rounded-full px-12 py-6 text-base font-bold w-full sm:w-auto animate-pulse"
+            >
+              {adClicked ? "Click Again to Continue" : cta}
+            </Button>
+          </>
         )}
         {verified && (
           <div className="space-y-3">
