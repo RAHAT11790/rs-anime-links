@@ -28,7 +28,7 @@ export default function Landing() {
           </p>
           <div className="flex gap-3 justify-center flex-wrap">
             <Link to="/register"><Button size="lg" variant="secondary" className="font-bold">Get Started Free</Button></Link>
-            <a href="https://t.me" target="_blank" rel="noreferrer"><Button size="lg" variant="outline" className="bg-white/10 border-white text-white hover:bg-white/20"><Send className="h-4 w-4 mr-2" /> Telegram</Button></a>
+            <a href="https://t.me/cartoonfunny03" target="_blank" rel="noreferrer"><Button size="lg" variant="outline" className="bg-white/10 border-white text-white hover:bg-white/20"><Send className="h-4 w-4 mr-2" /> Telegram Channel</Button></a>
           </div>
         </div>
       </section>
