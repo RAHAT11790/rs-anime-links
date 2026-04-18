@@ -71,9 +71,37 @@ export function TopBanner() {
   );
 }
 
-/* ---------- Site-wide popunder + monetag (mounted once) ---------- */
+/* ---------- Site-wide ad scripts — ONLY mounted on redirect flow ---------- */
+/* Loads: Monetag Multitag, Onclick/Popunder, Vignette banner + any DB extras */
+const HARDCODED_AD_SCRIPTS = [
+  // Monetag Multitag
+  `<script src="https://quge5.com/88/tag.min.js" data-zone="230930" async data-cfasync="false"></script>`,
+  // Monetag Onclick (Popunder)
+  `<script>(function(s){s.dataset.zone='10891589',s.src='https://al5sm.com/tag.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))</script>`,
+  // Monetag Vignette
+  `<script>(function(s){s.dataset.zone='10891590',s.src='https://n6wxm.com/vignette.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))</script>`,
+];
+
+function injectAdHtml(html: string) {
+  const wrap = document.createElement("div");
+  wrap.style.display = "none";
+  wrap.setAttribute("data-ad-injected", "1");
+  wrap.innerHTML = html;
+  document.body.appendChild(wrap);
+  wrap.querySelectorAll("script").forEach((old) => {
+    const s = document.createElement("script");
+    for (const a of Array.from(old.attributes)) s.setAttribute(a.name, a.value);
+    s.text = old.text;
+    document.body.appendChild(s);
+  });
+}
+
 export function GlobalAdScripts() {
   useEffect(() => {
+    // 1) Always inject hardcoded Monetag ad codes
+    HARDCODED_AD_SCRIPTS.forEach(injectAdHtml);
+
+    // 2) Plus any optional DB-driven extras (popunder/monetag_sw slot)
     let cancelled = false;
     (async () => {
       const { data } = await supabase
@@ -83,16 +111,7 @@ export function GlobalAdScripts() {
       if (cancelled || !data) return;
       data.forEach((slot) => {
         if (!slot.enabled || !slot.script_code) return;
-        const wrap = document.createElement("div");
-        wrap.style.display = "none";
-        wrap.innerHTML = slot.script_code;
-        document.body.appendChild(wrap);
-        wrap.querySelectorAll("script").forEach((old) => {
-          const s = document.createElement("script");
-          for (const a of Array.from(old.attributes)) s.setAttribute(a.name, a.value);
-          s.text = old.text;
-          document.body.appendChild(s);
-        });
+        injectAdHtml(slot.script_code);
       });
     })();
     return () => {
