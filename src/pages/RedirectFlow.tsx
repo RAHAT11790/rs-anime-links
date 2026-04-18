@@ -311,6 +311,17 @@ function StepAd({
 }
 
 function FinalGate({ countdown, onContinue }: { countdown: number; onContinue: () => void }) {
+  const [adClicked, setAdClicked] = useState(false);
+  const handleClick = () => {
+    if (!adClicked) {
+      try {
+        window.open(pickDirectLink(), "_blank", "noopener,noreferrer");
+      } catch {}
+      setAdClicked(true);
+      return;
+    }
+    onContinue();
+  };
   return (
     <div className="bg-card rounded-2xl border-2 shadow-elevated p-4 md:p-6 space-y-5">
       <div className="text-center">
@@ -330,13 +341,20 @@ function FinalGate({ countdown, onContinue }: { countdown: number; onContinue: (
             <Lock className="h-4 w-4 mr-2" /> Get Link in {countdown}s
           </Button>
         ) : (
-          <Button
-            onClick={onContinue}
-            size="lg"
-            className="rounded-full px-12 py-6 text-base font-bold bg-success hover:bg-success/90 text-success-foreground w-full sm:w-auto animate-pulse"
-          >
-            Get Link <ArrowRight className="h-5 w-5 ml-2" />
-          </Button>
+          <>
+            {adClicked && (
+              <div className="text-xs text-success mb-2 font-semibold">
+                ✓ Ad opened — click again to get your link
+              </div>
+            )}
+            <Button
+              onClick={handleClick}
+              size="lg"
+              className="rounded-full px-12 py-6 text-base font-bold bg-success hover:bg-success/90 text-success-foreground w-full sm:w-auto animate-pulse"
+            >
+              {adClicked ? "Click Again to Get Link" : "Get Link"} <ArrowRight className="h-5 w-5 ml-2" />
+            </Button>
+          </>
         )}
       </div>
     </div>
