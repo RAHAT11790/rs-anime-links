@@ -12,6 +12,7 @@ import { AdBlockGuard } from "@/components/AdBlockGuard";
 import { Button } from "@/components/ui/button";
 import { FeaturedArticle, ArticleGrid } from "@/components/ArticleBlock";
 import { LongPost, ImageGallery, QuickFacts } from "@/components/LongFormContent";
+import { BigArticleAuto } from "@/components/BigArticles";
 import {
   Loader2,
   ArrowRight,
@@ -365,6 +366,9 @@ function StepFlow({
       )}
 
       <QuickFacts />
+
+      {/* Big real-style article (Finance / Education) — adds 1500+ words for AdSense */}
+      <BigArticleAuto seed={step} />
 
       <LongPost index={step + 4} />
 
