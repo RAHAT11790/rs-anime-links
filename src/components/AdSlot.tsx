@@ -9,14 +9,18 @@ export function AdSlot({
   className = "",
   minHeight = 250,
   closable = true,
+  hideWhenDisabled = false,
 }: {
   slotKey: string;
   fallback?: React.ReactNode;
   className?: string;
   minHeight?: number;
   closable?: boolean;
+  /** When true: if the admin disabled this slot OR it has no script, render NOTHING (no fallback). Useful for AdSense slots that should be invisible until verified. */
+  hideWhenDisabled?: boolean;
 }) {
   const [code, setCode] = useState<string | null>(null);
+  const [disabled, setDisabled] = useState(false);
   const [closed, setClosed] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -29,9 +33,16 @@ export function AdSlot({
       .then(({ data }) => {
         if (data?.enabled && data.script_code && data.script_code.trim().length > 0) {
           setCode(data.script_code);
-        } else setCode("");
+          setDisabled(false);
+        } else {
+          setCode("");
+          setDisabled(true);
+        }
       });
   }, [slotKey]);
+
+  // Hidden mode: render absolutely nothing when disabled / empty.
+  if (hideWhenDisabled && (code === "" || disabled)) return null;
 
   useEffect(() => {
     if (!code || !ref.current) return;
