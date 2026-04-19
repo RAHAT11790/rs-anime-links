@@ -2,6 +2,8 @@ import { Link } from "react-router-dom";
 import logo from "@/assets/logo.png";
 import { Button } from "@/components/ui/button";
 import { Send, Link2, DollarSign, Users, BarChart3, Shield, Zap } from "lucide-react";
+import { LongPost, ImageGallery, QuickFacts } from "@/components/LongFormContent";
+import { AdSlot } from "@/components/AdSlot";
 
 export default function Landing() {
   return (
@@ -54,9 +56,34 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* AdSense responsive — hidden until admin enables */}
+      <div className="container max-w-4xl py-4">
+        <AdSlot slotKey="adsense_responsive" minHeight={0} hideWhenDisabled closable={false} />
+      </div>
+
+      {/* Long-form articles to make landing rich for AdSense review */}
+      <section className="container max-w-4xl py-8 space-y-6">
+        <h2 className="text-2xl md:text-3xl font-bold text-center">Latest Articles & Insights</h2>
+        <LongPost index={0} />
+        <LongPost index={1} />
+        <ImageGallery seed={1} />
+        <LongPost index={2} />
+        <QuickFacts />
+        <LongPost index={3} />
+        {/* AdSense Auto-Relaxed — hidden until admin enables */}
+        <AdSlot slotKey="adsense_relaxed" minHeight={0} hideWhenDisabled closable={false} />
+        <LongPost index={4} />
+        <LongPost index={5} />
+        <LongPost index={6} />
+      </section>
+
       <footer className="bg-sidebar text-sidebar-foreground py-8 mt-12">
-        <div className="container text-center text-sm opacity-70">
-          © {new Date().getFullYear()} RS ANIME LINK · Short Links and Earn Money
+        <div className="container text-center text-sm opacity-70 space-y-2">
+          <div>© {new Date().getFullYear()} RS ANIME LINK · Short Links and Earn Money</div>
+          <div className="flex justify-center gap-4 text-xs">
+            <a href="https://t.me/RS_WONER" target="_blank" rel="noreferrer" className="hover:underline">Contact Admin</a>
+            <a href="https://t.me/cartoonfunny03" target="_blank" rel="noreferrer" className="hover:underline">Telegram Channel</a>
+          </div>
         </div>
       </footer>
     </div>

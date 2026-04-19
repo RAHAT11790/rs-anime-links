@@ -11,6 +11,7 @@ import {
 import { AdBlockGuard } from "@/components/AdBlockGuard";
 import { Button } from "@/components/ui/button";
 import { FeaturedArticle, ArticleGrid } from "@/components/ArticleBlock";
+import { LongPost, ImageGallery, QuickFacts } from "@/components/LongFormContent";
 import {
   Loader2,
   ArrowRight,
@@ -330,12 +331,19 @@ function StepFlow({
         </div>
       </section>
 
-      {/* MIDDLE: Ads + real article content (makes pages longer & more "real") */}
+      {/* MIDDLE: real-looking article content + ads — makes pages long & rich for AdSense */}
       <FeaturedArticle />
+
+      {/* AdSense responsive (hidden until admin enables after Google verification) */}
+      <AdSlot slotKey="adsense_responsive" minHeight={0} hideWhenDisabled closable={false} className="w-full" />
+
+      <LongPost index={step} />
 
       <BannerSection title="Sponsored">
         <AdSlot slotKey={slotKey} minHeight={250} fallback={<FakeBanner />} />
       </BannerSection>
+
+      <ImageGallery seed={step} />
 
       {!isLightStep && (
         <>
@@ -343,13 +351,22 @@ function StepFlow({
             <AdSlot slotKey="adsterra_300x250" minHeight={250} className="w-full max-w-[300px] mx-auto" fallback={<FakeBanner />} />
           </BannerSection>
 
+          <LongPost index={step + 2} />
+
           <ArticleGrid count={2} seed={step} />
+
+          {/* AdSense Auto-Relaxed (hidden until admin enables) */}
+          <AdSlot slotKey="adsense_relaxed" minHeight={0} hideWhenDisabled closable={false} className="w-full" />
 
           <BannerSection title="Featured">
             <AdSlot slotKey="adsterra_native" minHeight={200} fallback={<FakeBanner />} />
           </BannerSection>
         </>
       )}
+
+      <QuickFacts />
+
+      <LongPost index={step + 4} />
 
       {isLightStep && <ArticleGrid count={2} seed={step + 5} />}
 
