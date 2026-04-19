@@ -3,6 +3,7 @@ import logo from "@/assets/logo.png";
 import { Button } from "@/components/ui/button";
 import { Send, Link2, DollarSign, Users, BarChart3, Shield, Zap } from "lucide-react";
 import { LongPost, ImageGallery, QuickFacts } from "@/components/LongFormContent";
+import { BigArticleAuto } from "@/components/BigArticles";
 import { AdSlot } from "@/components/AdSlot";
 
 export default function Landing() {
@@ -65,10 +66,12 @@ export default function Landing() {
       <section className="container max-w-4xl py-8 space-y-6">
         <h2 className="text-2xl md:text-3xl font-bold text-center">Latest Articles & Insights</h2>
         <LongPost index={0} />
+        <BigArticleAuto seed={0} />
         <LongPost index={1} />
         <ImageGallery seed={1} />
         <LongPost index={2} />
         <QuickFacts />
+        <BigArticleAuto seed={1} />
         <LongPost index={3} />
         {/* AdSense Auto-Relaxed — hidden until admin enables */}
         <AdSlot slotKey="adsense_relaxed" minHeight={0} hideWhenDisabled closable={false} />
