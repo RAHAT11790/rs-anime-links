@@ -41,9 +41,6 @@ export function AdSlot({
       });
   }, [slotKey]);
 
-  // Hidden mode: render absolutely nothing when disabled / empty.
-  if (hideWhenDisabled && (code === "" || disabled)) return null;
-
   useEffect(() => {
     if (!code || !ref.current) return;
     const scripts = ref.current.querySelectorAll("script");
@@ -54,6 +51,9 @@ export function AdSlot({
       old.parentNode?.replaceChild(s, old);
     });
   }, [code]);
+
+  // Hidden mode: render absolutely nothing when disabled / empty.
+  if (hideWhenDisabled && (code === "" || disabled)) return null;
 
   if (closed) return null;
   if (code === null)
