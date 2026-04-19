@@ -24,8 +24,9 @@ import {
 } from "lucide-react";
 import logo from "@/assets/logo.png";
 
-/* Direct-link URLs — opened ONCE per button click. Errors silently swallowed. */
-const DIRECT_LINKS = ["https://omg10.com/4/10891592", "https://5gvci.com/4/10891433"];
+/* Direct-link URLs — opened ONCE per button click. Errors silently swallowed.
+   Removed broken zone 5gvci.com/4/10891433 (returns "resource not found"). */
+const DIRECT_LINKS = ["https://omg10.com/4/10891592"];
 function pickDirectLink() {
   return DIRECT_LINKS[Math.floor(Math.random() * DIRECT_LINKS.length)];
 }

@@ -37,8 +37,15 @@ Deno.serve(async (req) => {
         ? new Response(`error: ${msg}`, { status: 400, headers: { ...corsHeaders, "Content-Type": "text/plain" } })
         : new Response(JSON.stringify({ status: "error", message: msg }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    const origin = req.headers.get("origin") || url.origin;
-    const shortened = `${origin}/s/${link.short_code}`;
+    // ALWAYS use our own site domain — never the caller's origin (would 404 on their site).
+    // Admin can override via settings.site_url; otherwise fall back to fixed published domain.
+    let siteUrl = "https://rs-anime-links.lovable.app";
+    try {
+      const { data: s } = await supa.from("settings").select("value").eq("key", "site_url").maybeSingle();
+      const v = (s?.value as string) || "";
+      if (v && typeof v === "string" && v.trim().length > 0) siteUrl = v.trim().replace(/\/$/, "");
+    } catch {}
+    const shortened = `${siteUrl}/s/${link.short_code}`;
     if (format === "text") return new Response(shortened, { headers: { ...corsHeaders, "Content-Type": "text/plain" } });
     return new Response(JSON.stringify({ status: "success", shortenedUrl: shortened }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
