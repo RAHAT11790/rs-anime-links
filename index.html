@@ -9,7 +9,27 @@
     <link rel="icon" type="image/png" href="/logo.png" />
     <link rel="apple-touch-icon" href="/logo.png" />
 
-    <script src="https://fpyf8.com/88/tag.min.js" data-zone="10891433" data-cfasync="false" async></script>
+    <!-- Google AdSense verification -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3615112291907355" crossorigin="anonymous"></script>
+    <meta name="google-adsense-account" content="ca-pub-3615112291907355" />
+
+    <script>
+      // Global error suppression for Monetag "resource not found" / blocked ad responses.
+      window.addEventListener("error", function (e) {
+        const msg = String(e?.message || "");
+        if (msg.includes("resource not found") || msg.includes("Script error")) {
+          e.preventDefault?.();
+          e.stopImmediatePropagation?.();
+          return true;
+        }
+      }, true);
+      window.addEventListener("unhandledrejection", function (e) {
+        const msg = String(e?.reason?.message || e?.reason || "");
+        if (msg.includes("resource not found")) {
+          e.preventDefault?.();
+        }
+      });
+    </script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", function () {
